@@ -15,19 +15,17 @@ CustomDPS.CustomDPSFrame = CreateFrame("Frame", "CustomDPSFrame");
 CustomDPS.CustomDPSFrame.MsgFrame = CreateFrame("Frame", nil, UIParent);
 
 -- Register the events we want to track
-CustomDPS.CustomDPSFrame:RegisterEvent("PLAYER_ENTERING_WORLD");
 CustomDPS.CustomDPSFrame:RegisterEvent("PLAYER_LOGIN");
 CustomDPS.CustomDPSFrame:RegisterEvent("PLAYER_REGEN_DISABLED"); -- Enter combat
 CustomDPS.CustomDPSFrame:RegisterEvent("PLAYER_REGEN_ENABLED"); -- Exit combat
 CustomDPS.CustomDPSFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED");
+CustomDPS.CustomDPSFrame:RegisterEvent("GROUP_ROSTER_UPDATE");
+CustomDPS.CustomDPSFrame:RegisterEvent("GROUP_LEFT");
 
 -- Event handler
 CustomDPS.CustomDPSFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_LOGIN" then
         self:initialize();
-    elseif event == "PLAYER_ENTERING_WORLD" then
-        CustomDPS.playerName = UnitName("player");
-        self:setUIText(CustomDPS.playerName .. " DPS: 0");
     elseif event == "PLAYER_REGEN_DISABLED" then
         -- We have entered combat
        self:enterCombat();
@@ -36,6 +34,10 @@ CustomDPS.CustomDPSFrame:SetScript("OnEvent", function(self, event, ...)
         self:exitCombat();
     elseif event == "COMBAT_LOG_EVENT_UNFILTERED" and CustomDPS.inCombat == true then
         self:handleCombatEvent();
+    elseif event == "GROUP_ROSTER_UPDATE" then
+        self:handleGroupChange();
+    elseif event == "GROUP_LEFT" then
+        print("TODO: Handle GROUP_LEFT");
     end
 end);
 
@@ -52,12 +54,20 @@ CustomDPS.CustomDPSFrame:SetScript("OnUpdate", function(self, elapsed)
 end);
 
 function CustomDPS.CustomDPSFrame:initialize()
+    CustomDPS.playerName = UnitName("player");
     self.MsgFrame:SetWidth(100);
     self.MsgFrame:SetHeight(100);
     self.MsgFrame:SetPoint("TOPLEFT", 200, -100);
     self.MsgFrame:SetFrameStrata("TOOLTIP");
     self.MsgFrame.text = self.MsgFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
     self.MsgFrame.text:SetPoint("CENTER");
+    self.MsgFrame.text:SetText(CustomDPS.playerName .. " DPS: 0");
+end
+
+-- Group
+
+function CustomDPS.CustomDPSFrame:handleGroupChange()
+    print("Group changed");
 end
 
 -- Combat
