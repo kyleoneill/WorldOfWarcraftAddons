@@ -24,18 +24,18 @@ CustomDPS.CustomDPSFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED");
 -- Event handler
 CustomDPS.CustomDPSFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_LOGIN" then
-        CustomDPS.CustomDPSFrame:initialize();
+        self:initialize();
     elseif event == "PLAYER_ENTERING_WORLD" then
         CustomDPS.playerName = UnitName("player");
-        CustomDPS.CustomDPSFrame:setUIText(CustomDPS.playerName .. " DPS: 0");
+        self:setUIText(CustomDPS.playerName .. " DPS: 0");
     elseif event == "PLAYER_REGEN_DISABLED" then
         -- We have entered combat
-        CustomDPS.CustomDPSFrame:enterCombat();
+       self:enterCombat();
     elseif event == "PLAYER_REGEN_ENABLED" then
         -- We have exited combat
-        CustomDPS.CustomDPSFrame:exitCombat();
+        self:exitCombat();
     elseif event == "COMBAT_LOG_EVENT_UNFILTERED" and CustomDPS.inCombat == true then
-        CustomDPS.CustomDPSFrame:handleCombatEvent();
+        self:handleCombatEvent();
     end
 end);
 
@@ -85,8 +85,8 @@ function CustomDPS.CustomDPSFrame:displayDPS()
     -- Currently doing 1, 2 would be a lot smoother. Would also use a lot more resources in large parties if I do that for each member? How
     -- do I do that efficiently?
 
-    local dps = CustomDPS.CustomDPSFrame:formattedDPS();
-    local totalDamage = CustomDPS.CustomDPSFrame:formatNumber(CustomDPS.damageBuffer);
+    local dps = self:formattedDPS();
+    local totalDamage = self:formatNumber(CustomDPS.damageBuffer);
     self:setUIText(CustomDPS.playerName .. " DPS: " .. dps .. "\n" .. CustomDPS.playerName .. " total damage: " .. totalDamage);
 end
 
@@ -100,7 +100,7 @@ end
 function CustomDPS.CustomDPSFrame:exitCombat()
     CustomDPS.timeBuffer = 0;
     CustomDPS.inCombat = false;
-    CustomDPS.CustomDPSFrame:setUIExitCombat();
+    self:setUIExitCombat();
 end
 
 function CustomDPS.CustomDPSFrame:calculateDPS()
@@ -108,8 +108,8 @@ function CustomDPS.CustomDPSFrame:calculateDPS()
 end
 
 function CustomDPS.CustomDPSFrame:formattedDPS()
-    local dps = CustomDPS.CustomDPSFrame:calculateDPS();
-    return CustomDPS.CustomDPSFrame:formatNumber(dps);
+    local dps = self:calculateDPS();
+    return self:formatNumber(dps);
 end
 
 function CustomDPS.CustomDPSFrame:formatNumber(num)
@@ -131,7 +131,7 @@ end
 -- UI
 
 function CustomDPS.CustomDPSFrame:setUIExitCombat()
-    local dps = CustomDPS.CustomDPSFrame:formattedDPS();
+    local dps = self:formattedDPS();
     self.MsgFrame.text:SetText(CustomDPS.playerName .. " DPS last fight: " .. dps);
 end
 
