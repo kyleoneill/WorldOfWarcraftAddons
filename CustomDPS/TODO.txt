@@ -1,0 +1,13 @@
+1. I should switch the displayDPS to using a more smooth and accurate method of keeping X amount of
+   events in a queue and, once the queue reaches some size (like 60 at 60fps), push/pop one event so it stays at that size.
+   Update DPS by averaging damage from all of the events in the queue against its size. Remember that an event in the queue
+   can be `nil` if there was no damage event from that tick. This is semi-similar to the way I use now, except every update the damage buffer
+   will be emptied into a queue event
+2. I need to track party member DPS. Maybe keep a running tally of people who join a party or who are in a party I join, remove them when I leave
+   a party or they leave the party I am in
+
+2.a. Building on this, maybe have a boss DPS. I can also have a boss DPS and party healing per second to see what our shortfall is on heals
+2.a.b. Can also make some sort of "estimate until target is dead" if we have the boss health and party dps
+
+3. Do something more interesting when exiting combat. Ex, display "Average DPS in your last combat encounter: x"
+4. Numerical formatting - seeing 473829 dps is not helpful. I should either add comma formatting or display the dps in thousands (473k)

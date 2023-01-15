@@ -1,0 +1,6 @@
+## Interface: 100002
+## Title: CustomDPS
+## Author: sammie287
+## Version: 0.0.1
+
+main.lua
