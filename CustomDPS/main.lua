@@ -1,14 +1,20 @@
 -- Put everything in the addon inside a unique global table to avoid name collision
 local CustomDPS = {};
+
+-- Queue ds and damage queue
 CustomDPS.Queue = {};
+CustomDPS.damageQueue = {};
+CustomDPS.damageQueueLength = 0;
+CustomDPS.windowLengthInSeconds = 60;
 
 -- Global variables
 CustomDPS.damageBuffer = 0;
 CustomDPS.timeBuffer = 0;
-CustomDPS.totalTimeForFight = 0;
+CustomDPS.damageDuringWindow = 0;
 CustomDPS.inCombat = false;
 CustomDPS.updateInterval = 1;
 CustomDPS.playerName = nil;
+CustomDPS.dps = 0;
 
 -- Frames to contain addon functions
 CustomDPS.CustomDPSFrame = CreateFrame("Frame", "CustomDPSFrame");
@@ -45,8 +51,8 @@ end);
 CustomDPS.CustomDPSFrame:SetScript("OnUpdate", function(self, elapsed)
     if CustomDPS.inCombat then
         CustomDPS.timeBuffer = CustomDPS.timeBuffer + elapsed;
-        CustomDPS.totalTimeForFight = CustomDPS.totalTimeForFight + elapsed;
         while CustomDPS.timeBuffer > CustomDPS.updateInterval do
+            self:updateDamageWindow();
             self:displayDPS();
             CustomDPS.timeBuffer = 0;
         end
@@ -66,11 +72,35 @@ end
 
 -- Group
 
+function CustomDPS.CustomDPSFrame:initializeGroup()
+    print("Initialize group");
+end
+
 function CustomDPS.CustomDPSFrame:handleGroupChange()
     print("Group changed");
 end
 
 -- Combat
+
+function CustomDPS.CustomDPSFrame:updateDamageWindow()
+    -- Add damage buffer to damageWindow
+    -- Check if damage queue is full
+    --   not full: Increment queueLength
+    --   full: Pop front, subtract popped from damageWindow
+    -- Re-calculate DPS. (damageWindow / queueLength) is DPS over the window. Reset damage buffer
+
+    CustomDPS.damageDuringWindow = CustomDPS.damageDuringWindow + CustomDPS.damageBuffer;
+    CustomDPS.Queue.pushright(CustomDPS.damageQueue, CustomDPS.damageBuffer);
+    -- queue gets one event a second, its length is equal to the amount of seconds the damage has been done over
+    if CustomDPS.damageQueueLength < CustomDPS.windowLengthInSeconds then
+        CustomDPS.damageQueueLength = CustomDPS.damageQueueLength + 1;
+    else
+        local poppedValue = CustomDPS.Queue.popleft(CustomDPS.damageQueue);
+        CustomDPS.damageDuringWindow = CustomDPS.damageDuringWindow - poppedValue;
+    end
+    CustomDPS.damageBuffer = 0;
+    CustomDPS.dps = math.floor(CustomDPS.damageDuringWindow / CustomDPS.damageQueueLength);
+end
 
 function CustomDPS.CustomDPSFrame:handleCombatEvent()
     local timestamp, subevent, hideCaster, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags = CombatLogGetCurrentEventInfo();
@@ -87,24 +117,13 @@ function CustomDPS.CustomDPSFrame:handleCombatEvent()
     end
 end
 
-function CustomDPS.CustomDPSFrame:displayDPS()
-    -- Need a way to smooth this
-    --   1. Keep a running time of damage and time for a fight. DPS is damage/time. This will cause DPS to become stagnant and not change during a long fight though
-    --   2. Every update add a data-frame to a queue. When the queue is at 60, add one and pop one. Calculate the DPS by
-    --      averaging the damage from each event (events can be nil if there was no damage event in a given update) divided by the size of the buffer (like 60)
-    -- Currently doing 1, 2 would be a lot smoother. Would also use a lot more resources in large parties if I do that for each member? How
-    -- do I do that efficiently?
-
-    local dps = self:formattedDPS();
-    local totalDamage = self:formatNumber(CustomDPS.damageBuffer);
-    self:setUIText(CustomDPS.playerName .. " DPS: " .. dps .. "\n" .. CustomDPS.playerName .. " total damage: " .. totalDamage);
-end
-
 function CustomDPS.CustomDPSFrame:enterCombat()
     CustomDPS.damageBuffer = 0;
     CustomDPS.timeBuffer = 0;
-    CustomDPS.totalTimeForFight = 0;
+    CustomDPS.damageDuringWindow = 0;
     CustomDPS.inCombat = true;
+    CustomDPS.damageQueue = CustomDPS.Queue.new();
+    CustomDPS.damageQueueLength = 0;
 end
 
 function CustomDPS.CustomDPSFrame:exitCombat()
@@ -113,13 +132,8 @@ function CustomDPS.CustomDPSFrame:exitCombat()
     self:setUIExitCombat();
 end
 
-function CustomDPS.CustomDPSFrame:calculateDPS()
-    return math.floor(CustomDPS.damageBuffer / CustomDPS.totalTimeForFight);
-end
-
 function CustomDPS.CustomDPSFrame:formattedDPS()
-    local dps = self:calculateDPS();
-    return self:formatNumber(dps);
+    return self:formatNumber(CustomDPS.dps);
 end
 
 function CustomDPS.CustomDPSFrame:formatNumber(num)
@@ -141,12 +155,15 @@ end
 -- UI
 
 function CustomDPS.CustomDPSFrame:setUIExitCombat()
-    local dps = self:formattedDPS();
-    self.MsgFrame.text:SetText(CustomDPS.playerName .. " DPS last fight: " .. dps);
+    self.MsgFrame.text:SetText(CustomDPS.playerName .. " DPS last fight: " .. self:formattedDPS());
 end
 
 function CustomDPS.CustomDPSFrame:setUIText(newText)
     self.MsgFrame.text:SetText(newText);
+end
+
+function CustomDPS.CustomDPSFrame:displayDPS()
+    self:setUIText(CustomDPS.playerName .. " DPS: " .. self:formattedDPS());
 end
 
 -- Queue
