@@ -2,3 +2,8 @@
    a party or they leave the party I am in
 1.a. Building on this, maybe have a boss DPS. I can also have a boss DPS and party healing per second to see what our shortfall is on heals
 1.a.b. Can also make some sort of "estimate until target is dead" if we have the boss health and party dps
+
+2. Make the UI actually good.
+2.a. This [HOWTO](https://wowpedia.fandom.com/wiki/HOWTOs) has pages on UI stuff
+   - Draggable frames - https://wowpedia.fandom.com/wiki/Making_draggable_frames
+   - Resizable frames - https://wowpedia.fandom.com/wiki/Making_resizable_frames

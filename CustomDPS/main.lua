@@ -15,10 +15,11 @@ CustomDPS.inCombat = false;
 CustomDPS.updateInterval = 1;
 CustomDPS.playerName = nil;
 CustomDPS.dps = 0;
+CustomDPS.party = {};
 
 -- Frames to contain addon functions
 CustomDPS.CustomDPSFrame = CreateFrame("Frame", "CustomDPSFrame");
-CustomDPS.CustomDPSFrame.MsgFrame = CreateFrame("Frame", nil, UIParent);
+CustomDPS.CustomDPSFrame.MsgFrame = CreateFrame("Frame", nil, UIParent, "BackdropTemplate");
 
 -- Register the events we want to track
 CustomDPS.CustomDPSFrame:RegisterEvent("PLAYER_LOGIN");
@@ -38,12 +39,12 @@ CustomDPS.CustomDPSFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "PLAYER_REGEN_ENABLED" then
         -- We have exited combat
         self:exitCombat();
-    elseif event == "COMBAT_LOG_EVENT_UNFILTERED" and CustomDPS.inCombat == true then
+    elseif event == "COMBAT_LOG_EVENT_UNFILTERED" and CustomDPS.inCombat then
         self:handleCombatEvent();
     elseif event == "GROUP_ROSTER_UPDATE" then
         self:handleGroupChange();
     elseif event == "GROUP_LEFT" then
-        print("TODO: Handle GROUP_LEFT");
+        self:handleLeaveGroup();
     end
 end);
 
@@ -61,12 +62,28 @@ end);
 
 function CustomDPS.CustomDPSFrame:initialize()
     CustomDPS.playerName = UnitName("player");
-    self.MsgFrame:SetWidth(100);
-    self.MsgFrame:SetHeight(100);
+    self.MsgFrame:SetWidth(250);
+    self.MsgFrame:SetHeight(75);
     self.MsgFrame:SetPoint("TOPLEFT", 200, -100);
     self.MsgFrame:SetFrameStrata("TOOLTIP");
+
+    -- UI Backdrop
+    self.MsgFrame:SetBackdrop(BACKDROP_TUTORIAL_16_16);
+
+    -- UI Draggability
+    self.MsgFrame:SetMovable(true);
+    self.MsgFrame:EnableMouse(true);
+    self.MsgFrame:RegisterForDrag("LeftButton");
+    self.MsgFrame:SetScript("OnDragStart", function(self, button)
+        self:StartMoving();
+    end);
+    self.MsgFrame:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing();
+    end);
+
+    -- UI Text
     self.MsgFrame.text = self.MsgFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
-    self.MsgFrame.text:SetPoint("CENTER");
+    self.MsgFrame.text:SetPoint("TOPLEFT", 10, -10);
     self.MsgFrame.text:SetText(CustomDPS.playerName .. " DPS: 0");
 end
 
@@ -77,7 +94,19 @@ function CustomDPS.CustomDPSFrame:initializeGroup()
 end
 
 function CustomDPS.CustomDPSFrame:handleGroupChange()
+    -- check "if in group" here, this will also fire when I leave a group and lead to nil errors
+    -- The group change event also fires when people phase and unphase, leading to a lot of redundant calls
+    --   will need some way to check if the new group is the same as a saved/cached group to check if we should actually do initization
+    --   I doubt I can just do `table == table` so will need to figure out how to check if tables have all equal list values. Just iterate?
+    -- Also I am not in the group returned here (at least for normal non raid groups) so I'll need to add myself into the first empty slot
+    -- ALSO will need to check `is in group` in self:initialize
+    local partyInfo = GetHomePartyInfo();
+    print(dumpTable(partyInfo));
     print("Group changed");
+end
+
+function CustomDPS.CustomDPSFrame:handleLeaveGroup()
+    CustomDPS.party = {};
 end
 
 -- Combat
@@ -201,6 +230,22 @@ function CustomDPS.Queue.popright (queue)
     queue.last = last - 1
     return value
 end
+
+-- Other Misc
+
+function dumpTable(o)
+    if type(o) == 'table' then
+       local s = '{ '
+       for k,v in pairs(o) do
+          if type(k) ~= 'number' then k = '"'..k..'"' end
+          s = s .. '['..k..'] = ' .. dumpTable(v) .. ','
+       end
+       return s .. '} '
+    else
+       return tostring(o)
+    end
+ end
+ 
 
 -- Misc function I wrote to learn
 function printMoney()
