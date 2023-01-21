@@ -85,7 +85,7 @@ function CustomDPS.CustomDPSFrame:initialize()
     -- UI Text
     self.MsgFrame.text = self.MsgFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
     self.MsgFrame.text:SetPoint("TOPLEFT", 10, -10);
-    self.MsgFrame.text:SetText(CustomDPS.playerName .. " DPS: 0");
+    self:displayDPS();
 end
 
 -- Group
@@ -99,15 +99,17 @@ end
 
 function CustomDPS.CustomDPSFrame:initializeGroup()
     CustomDPS.party = {};
-    CustomDPS.party[CustomDPS.playerName] = {};
+    self:initializeGroupMember(CustomDPS.playerName);
     self:handleGroupChange();
 end
 
 function CustomDPS.CustomDPSFrame:handleGroupChange()
     local partyInfo = GetHomePartyInfo();
-    for k, v in pairs(partyInfo) do
-        if CustomDPS.party[v] == nil then
-            self:initializeGroupMember(v);
+    if partyInfo ~= nil then
+        for k, v in pairs(partyInfo) do
+            if CustomDPS.party[v] == nil then
+                self:initializeGroupMember(v);
+            end
         end
     end
 end
@@ -201,7 +203,7 @@ end
 -- UI
 
 function CustomDPS.CustomDPSFrame:setUIExitCombat()
-    self.MsgFrame.text:SetText(CustomDPS.playerName .. " DPS last fight: " .. self:formattedDPS(CustomDPS.playerName));
+    -- self.MsgFrame.text:SetText(CustomDPS.playerName .. " DPS last fight: " .. self:formattedDPS(CustomDPS.playerName));
 end
 
 function CustomDPS.CustomDPSFrame:setUIText(newText)
@@ -209,7 +211,12 @@ function CustomDPS.CustomDPSFrame:setUIText(newText)
 end
 
 function CustomDPS.CustomDPSFrame:displayDPS()
-    self:setUIText(CustomDPS.playerName .. " DPS: " .. self:formattedDPS(CustomDPS.playerName));
+    -- TODO: This should be ordered in most to least dps, maybe display the player character somewhere on its own?
+    local stringBuilder = "";
+    for k, v in pairs(CustomDPS.party) do
+        stringBuilder = stringBuilder .. k .. " DPS: " .. self:formattedDPS(k) .. "\n";
+    end
+    self:setUIText(stringBuilder);
 end
 
 -- Queue

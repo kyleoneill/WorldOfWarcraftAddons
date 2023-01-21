@@ -1,14 +1,12 @@
-1. I need to track party member DPS. Maybe keep a running tally of people who join a party or who are in a party I join, remove them when I leave
-   a party or they leave the party I am in
-1.a. Building on this, maybe have a boss DPS. I can also have a boss DPS and party healing per second to see what our shortfall is on heals
-1.a.b. Can also make some sort of "estimate until target is dead" if we have the boss health and party dps
+1. Need to improve group functionality, specifically better capture group events. Should be using more accurate events, like
+   "group joined", "member_left", "member_joined", etc. The current event fires every time somebody phases.
 
 2. Make the UI actually good.
 2.a. This [HOWTO](https://wowpedia.fandom.com/wiki/HOWTOs) has pages on UI stuff
    - Draggable frames - https://wowpedia.fandom.com/wiki/Making_draggable_frames
    - Resizable frames - https://wowpedia.fandom.com/wiki/Making_resizable_frames
 
-3. After there is group functionality, ordering party members based on their DPS
+3. Ordering party members based on their DPS
    - Would be helpful to separate the logged in player so the "most relevant" dps can be seen easily
-4. After there is group functionality, clearing a member out of the group table when they leave the party
+4. Clearing a member out of the group table when they leave the party
    - A table is entirely emptied when the group is left, but I should be clearing out a players entry when they leave the party
