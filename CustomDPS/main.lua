@@ -1,16 +1,12 @@
 -- Put everything in the addon inside a unique global table to avoid name collision
 local CustomDPS = {};
 
--- Queue ds and damage queue
+-- Queue
 CustomDPS.Queue = {};
-CustomDPS.damageQueue = {};
-CustomDPS.damageQueueLength = 0;
 CustomDPS.windowLengthInSeconds = 60;
 
 -- Global variables
-CustomDPS.damageBuffer = 0;
 CustomDPS.timeBuffer = 0;
-CustomDPS.damageDuringWindow = 0;
 CustomDPS.inCombat = false;
 CustomDPS.updateInterval = 1;
 CustomDPS.playerName = nil;
@@ -42,6 +38,8 @@ CustomDPS.CustomDPSFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "COMBAT_LOG_EVENT_UNFILTERED" and CustomDPS.inCombat then
         self:handleCombatEvent();
     elseif event == "GROUP_ROSTER_UPDATE" then
+        -- TODO: The group change event also fires when people phase and unphase, leading to a lot of redundant calls
+        -- I might to handle want more specific behavior, like "MEMBER_LEFT", "MEMBER_JOIN", "JOINED_GROUP"
         self:handleGroupChange();
     elseif event == "GROUP_LEFT" then
         self:handleLeaveGroup();
@@ -81,6 +79,9 @@ function CustomDPS.CustomDPSFrame:initialize()
         self:StopMovingOrSizing();
     end);
 
+    -- Party info
+    self:initializeGroup();
+
     -- UI Text
     self.MsgFrame.text = self.MsgFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
     self.MsgFrame.text:SetPoint("TOPLEFT", 10, -10);
@@ -89,24 +90,39 @@ end
 
 -- Group
 
+-- Group member structure
+-- CustomDPS.party[partyMemberName]
+-- CustomDPS.party[partyMemberName]["damageDuringWindow"]
+-- CustomDPS.party[partyMemberName]["dps"]
+-- CustomDPS.party[partyMemberName]["damageQueue"]
+-- CustomDPS.party[partyMemberName]["damageQueueLength"]
+
 function CustomDPS.CustomDPSFrame:initializeGroup()
-    print("Initialize group");
+    CustomDPS.party = {};
+    CustomDPS.party[CustomDPS.playerName] = {};
+    self:handleGroupChange();
 end
 
 function CustomDPS.CustomDPSFrame:handleGroupChange()
-    -- check "if in group" here, this will also fire when I leave a group and lead to nil errors
-    -- The group change event also fires when people phase and unphase, leading to a lot of redundant calls
-    --   will need some way to check if the new group is the same as a saved/cached group to check if we should actually do initization
-    --   I doubt I can just do `table == table` so will need to figure out how to check if tables have all equal list values. Just iterate?
-    -- Also I am not in the group returned here (at least for normal non raid groups) so I'll need to add myself into the first empty slot
-    -- ALSO will need to check `is in group` in self:initialize
     local partyInfo = GetHomePartyInfo();
-    print(dumpTable(partyInfo));
-    print("Group changed");
+    for k, v in pairs(partyInfo) do
+        if CustomDPS.party[v] == nil then
+            self:initializeGroupMember(v);
+        end
+    end
 end
 
 function CustomDPS.CustomDPSFrame:handleLeaveGroup()
-    CustomDPS.party = {};
+    self:initializeGroup();
+end
+
+function CustomDPS.CustomDPSFrame:initializeGroupMember(groupMemberName)
+    CustomDPS.party[groupMemberName] = {};
+    CustomDPS.party[groupMemberName]["damageBuffer"] = 0;
+    CustomDPS.party[groupMemberName]["damageDuringWindow"] = 0;
+    CustomDPS.party[groupMemberName]["damageQueue"] = CustomDPS.Queue.new();
+    CustomDPS.party[groupMemberName]["damageQueueLength"] = 0;
+    CustomDPS.party[groupMemberName]["dps"] = 0;
 end
 
 -- Combat
@@ -118,51 +134,52 @@ function CustomDPS.CustomDPSFrame:updateDamageWindow()
     --   full: Pop front, subtract popped from damageWindow
     -- Re-calculate DPS. (damageWindow / queueLength) is DPS over the window. Reset damage buffer
 
-    CustomDPS.damageDuringWindow = CustomDPS.damageDuringWindow + CustomDPS.damageBuffer;
-    CustomDPS.Queue.pushright(CustomDPS.damageQueue, CustomDPS.damageBuffer);
-    -- queue gets one event a second, its length is equal to the amount of seconds the damage has been done over
-    if CustomDPS.damageQueueLength < CustomDPS.windowLengthInSeconds then
-        CustomDPS.damageQueueLength = CustomDPS.damageQueueLength + 1;
-    else
-        local poppedValue = CustomDPS.Queue.popleft(CustomDPS.damageQueue);
-        CustomDPS.damageDuringWindow = CustomDPS.damageDuringWindow - poppedValue;
+    for k, v in pairs(CustomDPS.party) do
+        v["damageDuringWindow"] = v["damageDuringWindow"] + v["damageBuffer"];
+        CustomDPS.Queue.pushright(v["damageQueue"], v["damageBuffer"]);
+        -- queue gets one event a second, its length is equal to the amount of seconds the damage has been done over
+        if v["damageQueueLength"] < CustomDPS.windowLengthInSeconds then
+            v["damageQueueLength"] = v["damageQueueLength"] + 1;
+        else
+            local poppedValue = CustomDPS.Queue.popleft(v["damageQueue"]);
+            v["damageDuringWindow"] = v["damageDuringWindow"] - poppedValue;
+        end
+        v["damageBuffer"] = 0;
+        v["dps"] = math.floor(v["damageDuringWindow"] / v["damageQueueLength"]);
     end
-    CustomDPS.damageBuffer = 0;
-    CustomDPS.dps = math.floor(CustomDPS.damageDuringWindow / CustomDPS.damageQueueLength);
 end
 
 function CustomDPS.CustomDPSFrame:handleCombatEvent()
     local timestamp, subevent, hideCaster, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags = CombatLogGetCurrentEventInfo();
-    if sourceName ~= nil and sourceName == CustomDPS.playerName then
+    -- If the damage has a source and that source is a party member
+    if sourceName ~= nil and CustomDPS.party[sourceName] ~= nil then
         -- Do I want to do anything with other subevents? What about healing?
         -- Will want to also figure out how to handle events from other players, like tracking party member DPS and the party DPS as a whole
         if subevent == "SWING_DAMAGE" then
             local damageAmount = select(12, CombatLogGetCurrentEventInfo());
-            CustomDPS.damageBuffer = CustomDPS.damageBuffer + damageAmount;
+            CustomDPS.party[sourceName]["damageBuffer"] = CustomDPS.party[sourceName]["damageBuffer"] + damageAmount;
         elseif subevent == "SPELL_DAMAGE" or subevent == "SPELL_PERIODIC_DAMAGE" then
             local damageAmount = select(15, CombatLogGetCurrentEventInfo());
-            CustomDPS.damageBuffer = CustomDPS.damageBuffer + damageAmount;
+            CustomDPS.party[sourceName]["damageBuffer"] = CustomDPS.party[sourceName]["damageBuffer"] + damageAmount;
         end
     end
 end
 
 function CustomDPS.CustomDPSFrame:enterCombat()
-    CustomDPS.damageBuffer = 0;
+    for k, v in pairs(CustomDPS.party) do
+        self:initializeGroupMember(k);
+    end
     CustomDPS.timeBuffer = 0;
-    CustomDPS.damageDuringWindow = 0;
     CustomDPS.inCombat = true;
-    CustomDPS.damageQueue = CustomDPS.Queue.new();
-    CustomDPS.damageQueueLength = 0;
 end
 
 function CustomDPS.CustomDPSFrame:exitCombat()
-    CustomDPS.timeBuffer = 0;
     CustomDPS.inCombat = false;
     self:setUIExitCombat();
 end
 
-function CustomDPS.CustomDPSFrame:formattedDPS()
-    return self:formatNumber(CustomDPS.dps);
+function CustomDPS.CustomDPSFrame:formattedDPS(playerName)
+    return self:formatNumber(CustomDPS.party[playerName]["dps"]);
 end
 
 function CustomDPS.CustomDPSFrame:formatNumber(num)
@@ -184,7 +201,7 @@ end
 -- UI
 
 function CustomDPS.CustomDPSFrame:setUIExitCombat()
-    self.MsgFrame.text:SetText(CustomDPS.playerName .. " DPS last fight: " .. self:formattedDPS());
+    self.MsgFrame.text:SetText(CustomDPS.playerName .. " DPS last fight: " .. self:formattedDPS(CustomDPS.playerName));
 end
 
 function CustomDPS.CustomDPSFrame:setUIText(newText)
@@ -192,7 +209,7 @@ function CustomDPS.CustomDPSFrame:setUIText(newText)
 end
 
 function CustomDPS.CustomDPSFrame:displayDPS()
-    self:setUIText(CustomDPS.playerName .. " DPS: " .. self:formattedDPS());
+    self:setUIText(CustomDPS.playerName .. " DPS: " .. self:formattedDPS(CustomDPS.playerName));
 end
 
 -- Queue
