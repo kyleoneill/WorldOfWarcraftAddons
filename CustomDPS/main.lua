@@ -1,5 +1,5 @@
 -- Put everything in the addon inside a unique global table to avoid name collision
-local CustomDPS = {};
+CustomDPS = {};
 
 -- Queue
 CustomDPS.Queue = {};
@@ -30,19 +30,11 @@ CustomDPS.CustomDPSFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_LOGIN" then
         self:initialize();
     elseif event == "PLAYER_REGEN_DISABLED" then
-        -- We have entered combat
        self:enterCombat();
     elseif event == "PLAYER_REGEN_ENABLED" then
-        -- We have exited combat
         self:exitCombat();
     elseif event == "COMBAT_LOG_EVENT_UNFILTERED" and CustomDPS.inCombat then
         self:handleCombatEvent();
-    elseif event == "GROUP_ROSTER_UPDATE" then
-        -- TODO: The group change event also fires when people phase and unphase, leading to a lot of redundant calls
-        -- I might to handle want more specific behavior, like "MEMBER_LEFT", "MEMBER_JOIN", "JOINED_GROUP"
-        self:handleGroupChange();
-    elseif event == "GROUP_LEFT" then
-        self:handleLeaveGroup();
     end
 end);
 
@@ -79,13 +71,29 @@ function CustomDPS.CustomDPSFrame:initialize()
         self:StopMovingOrSizing();
     end);
 
-    -- Party info
-    self:initializeGroup();
+    -- UI Resizing
+    self.MsgFrame:SetResizable(true);
+    self.MsgFrame:SetResizeBounds(250, 75, 250, 600);
+
+    -- This makes the little triangle button used to resize
+    local br = CreateFrame("Button", nil, self.MsgFrame);
+    br:EnableMouse("true");
+    br:SetPoint("BOTTOMRIGHT");
+    br:SetSize(16,16);
+    br:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down");
+    br:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight");
+    br:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up");
+    br:SetScript("OnMouseDown", function(self)
+        self:GetParent():StartSizing("BOTTOMRIGHT");
+    end);
+    br:SetScript("OnMouseUp", function(self)
+        self:GetParent():StopMovingOrSizing("BOTTOMRIGHT");
+    end);
 
     -- UI Text
     self.MsgFrame.text = self.MsgFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight");
     self.MsgFrame.text:SetPoint("TOPLEFT", 10, -10);
-    self:displayDPS();
+    self.MsgFrame.text:SetJustifyH("LEFT");
 end
 
 -- Group
@@ -111,11 +119,8 @@ function CustomDPS.CustomDPSFrame:handleGroupChange()
                 self:initializeGroupMember(v);
             end
         end
+        self:displayDPS();
     end
-end
-
-function CustomDPS.CustomDPSFrame:handleLeaveGroup()
-    self:initializeGroup();
 end
 
 function CustomDPS.CustomDPSFrame:initializeGroupMember(groupMemberName)
@@ -168,16 +173,13 @@ function CustomDPS.CustomDPSFrame:handleCombatEvent()
 end
 
 function CustomDPS.CustomDPSFrame:enterCombat()
-    for k, v in pairs(CustomDPS.party) do
-        self:initializeGroupMember(k);
-    end
+    self:initializeGroup();
     CustomDPS.timeBuffer = 0;
     CustomDPS.inCombat = true;
 end
 
 function CustomDPS.CustomDPSFrame:exitCombat()
     CustomDPS.inCombat = false;
-    self:setUIExitCombat();
 end
 
 function CustomDPS.CustomDPSFrame:formattedDPS(playerName)
@@ -202,90 +204,17 @@ end
 
 -- UI
 
-function CustomDPS.CustomDPSFrame:setUIExitCombat()
-    -- self.MsgFrame.text:SetText(CustomDPS.playerName .. " DPS last fight: " .. self:formattedDPS(CustomDPS.playerName));
-end
-
 function CustomDPS.CustomDPSFrame:setUIText(newText)
     self.MsgFrame.text:SetText(newText);
 end
 
 function CustomDPS.CustomDPSFrame:displayDPS()
     -- TODO: This should be ordered in most to least dps, maybe display the player character somewhere on its own?
-    local stringBuilder = "";
+    local stringBuilder = CustomDPS.playerName .. " DPS: " .. self:formattedDPS(CustomDPS.playerName) .. "\n\n";
+    -- [playerName]["dps"]
+    -- table.sort(CustomDPS.party, function(a, b) return a[2] > b[2] end)
     for k, v in pairs(CustomDPS.party) do
         stringBuilder = stringBuilder .. k .. " DPS: " .. self:formattedDPS(k) .. "\n";
     end
     self:setUIText(stringBuilder);
-end
-
--- Queue
-
-function CustomDPS.Queue.new()
-    return {first = 0, last = -1}
-end
-
-function CustomDPS.Queue.pushleft (queue, value)
-    local first = queue.first - 1
-    queue.first = first
-    queue[first] = value
-end
-  
-function CustomDPS.Queue.pushright (queue, value)
-    local last = queue.last + 1
-    queue.last = last
-    queue[last] = value
-end
-
-function CustomDPS.Queue.popleft (queue)
-    local first = queue.first
-    if first > queue.last then error("queue is empty") end
-    local value = queue[first]
-    queue[first] = nil        -- to allow garbage collection
-    queue.first = first + 1
-    return value
-end
-
-function CustomDPS.Queue.popright (queue)
-    local last = queue.last
-    if queue.first > last then error("queue is empty") end
-    local value = queue[last]
-    queue[last] = nil         -- to allow garbage collection
-    queue.last = last - 1
-    return value
-end
-
--- Other Misc
-
-function dumpTable(o)
-    if type(o) == 'table' then
-       local s = '{ '
-       for k,v in pairs(o) do
-          if type(k) ~= 'number' then k = '"'..k..'"' end
-          s = s .. '['..k..'] = ' .. dumpTable(v) .. ','
-       end
-       return s .. '} '
-    else
-       return tostring(o)
-    end
- end
- 
-
--- Misc function I wrote to learn
-function printMoney()
-    gold = 0;
-    silver = 0;
-    copper = 0;
-    currentMoneyInCopper = GetMoney();
-    if currentMoneyInCopper > 10000 then
-        gold = math.floor(currentMoneyInCopper / 10000);
-        temp = gold * 10000;
-        currentMoneyInCopper = currentMoneyInCopper - temp;
-    end
-    if currentMoneyInCopper > 100 then
-        silver = math.floor(currentMoneyInCopper / 100);
-        temp = silver * 100;
-        currentMoneyInCopper = currentMoneyInCopper - temp;
-    end
-    print('Gold: ' .. gold .. '\n' .. 'Silver: ' .. silver .. '\n' .. 'Copper: ' .. currentMoneyInCopper);
 end
