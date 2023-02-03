@@ -18,3 +18,8 @@ Maybe another button toggle to reset the DPS and then change when DPS is reset?
 - Maybe just pause the tallying of DPS when out of combat rather than entirely clearing it out, this seems much more reasonable
 
 fix display or max out how much is displayed when in large groups
+
+
+Info:
+/etrace
+   - event trace, extremely useful tool for seeing the event stream in wow
