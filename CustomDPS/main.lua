@@ -173,12 +173,18 @@ end
 function CustomDPS.CustomDPSFrame:enterCombat()
     self:initializeGroup();
     CustomDPS.timeBuffer = 0;
+    if self.MsgFrame.dpsList ~= nil then
+        -- If a dpsList exists from the last run, hide it as it has not been garbage collected yet
+        self.MsgFrame.dpsList:Hide();
+    end
     self:createDPSList();
     CustomDPS.inCombat = true;
 end
 
 function CustomDPS.CustomDPSFrame:exitCombat()
     CustomDPS.inCombat = false;
+    -- If I set dpsList to nil here it isn't being garbage collected by time I enter combat again?
+    -- self.MsgFrame.dpsList = nil;
 end
 
 function CustomDPS.CustomDPSFrame:formattedDPS(playerName)
@@ -204,12 +210,11 @@ end
 -- UI
 
 function CustomDPS.CustomDPSFrame:displayDPS()
-    -- Re-initialize the DPS list. Should I do something more efficient here?
-    -- e.g. make all of these components when I enter combat and just update them every time displayDPS is called
     -- TODO: This should be ordered in most to least dps, maybe display the player character somewhere on its own?
-    self:processPlayerDPS(CustomDPS.playerName, self:formattedDPS(CustomDPS.playerName));
-    -- [playerName]["dps"]
     -- table.sort(CustomDPS.party, function(a, b) return a[2] > b[2] end)
+    
+    -- TODO: Would love to be able to display the current players DPS standalone away from the list
+    --       for easy glancing at
     for k, v in pairs(CustomDPS.party) do
         local dpsListing = self:processPlayerDPS(k, self:formattedDPS(k));
     end
@@ -217,8 +222,7 @@ end
 
 function CustomDPS.CustomDPSFrame:createDPSList()
     self.MsgFrame.dpsList = CreateFrame("Frame", nil, self.MsgFrame);
-    -- self.MsgFrame.dpsList:SetPoint("TOPLEFT", 10, -10);
-    self.MsgFrame.dpsList:SetPoint("CENTER", 0, 0);
+    self.MsgFrame.dpsList:SetPoint("TOPLEFT", 60, -15);
     self.MsgFrame.dpsList:SetWidth(1);
     self.MsgFrame.dpsList:SetHeight(1);
     self.MsgFrame.dpsList.values = {};
@@ -226,12 +230,10 @@ end
 
 function CustomDPS.CustomDPSFrame:processPlayerDPS(playerName, dps)
     local valueName = playerName .. "-dps";
-    local dpsListing = nil;
-    if self.MsgFrame.dpsList.values[valueName] ~= nil then
-        dpsListing = self.MsgFrame.dpsList.values[valueName]
-    else
+    local dpsListing = self.MsgFrame.dpsList.values[valueName];
+    if dpsListing == nil then
         dpsListing = self.MsgFrame.dpsList:CreateFontString(valueName, "overlay", "GameFontNormal");
-        dpsListing:SetPoint("RIGHT", 0, 0);
+        dpsListing:SetPoint("CENTER", 0, 0);
         dpsListing:SetJustifyH("LEFT");
         self.MsgFrame.dpsList.values[valueName] = dpsListing;
     end
